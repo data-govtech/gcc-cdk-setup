@@ -22,7 +22,9 @@ export class PipelineStack extends cdk.Stack {
     });
 
     this.roleCodepipeline = this.createRoleCodePipeline(`AWSCodePipelineRole`);
-
+    this.updateRoleCodeBuild(
+      `arn:aws:iam::${cdk.Aws.ACCOUNT_ID}:role/AWSCodeBuildRole`
+    );
     this.output();
   }
 
@@ -40,12 +42,12 @@ export class PipelineStack extends cdk.Stack {
       "AWSCodePipelineFullAccess",
       "AWSCloudFormationFullAccess",
       "AmazonS3FullAccess",
+      "AmazonECS_FullAccess",
     ];
 
     managedPolicies.forEach((policy) => {
       role.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName(policy));
     });
-
     role.addToPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
@@ -70,8 +72,33 @@ export class PipelineStack extends cdk.Stack {
         ],
       })
     );
-
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+        ],
+        resources: [
+          `arn:aws:logs:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:log-group:/*`,
+        ],
+      })
+    );
     return role;
+  }
+
+  private updateRoleCodeBuild(roleArn: string) {
+    const role = iam.Role.fromRoleArn(this, "cdk-codebuild-role", roleArn, {
+      mutable: true,
+    });
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ["sts:AssumeRole", "iam:PassRole"],
+        resources: ["*"],
+      })
+    );
   }
 
   private output() {
